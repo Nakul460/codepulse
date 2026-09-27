@@ -9,14 +9,20 @@ import {
   listMembers,
   logActivity,
 } from "@/lib/projects";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation";
 
 type Context = RouteContext<"/api/projects/[projectId]/members">;
 
-export async function GET(_request: Request, ctx: Context) {
+export async function GET(request: Request, ctx: Context) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     const { projectId } = await ctx.params;
 
     // The roster exposes every collaborator's email address, so it is limited
@@ -31,9 +37,11 @@ export async function GET(_request: Request, ctx: Context) {
 }
 
 export async function POST(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId } = await ctx.params;
 
     await assertCanManageMembers(projectId, user);
@@ -65,8 +73,9 @@ export async function POST(request: Request, ctx: Context) {
       );
     }
 
-    // Membership is keyed to invitee.id, so an unverified address would hand
-    // access to whoever registered it, not to the real mailbox owner.
+    // Membership is keyed to `invitee.id`, which `findUserByEmail` guarantees to
+    // be the canonical user id. An unverified address would hand access to
+    // whoever registered it, not to the real mailbox owner.
     if (emailVerificationAvailable && !invitee.emailVerified) {
       return NextResponse.json(
         {

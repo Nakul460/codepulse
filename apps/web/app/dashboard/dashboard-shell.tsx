@@ -2,6 +2,7 @@
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { OrganizationProvider } from "@/components/organization-provider";
+import { AppSidebar } from "@/components/app-sidebar";
 
 /**
  * Client half of the dashboard layout. The session check itself lives in the
@@ -14,7 +15,10 @@ export function DashboardShell({
 }) {
   return (
     <OrganizationProvider>
-      <SidebarProvider>{children}</SidebarProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        {children}
+      </SidebarProvider>
     </OrganizationProvider>
   );
 }

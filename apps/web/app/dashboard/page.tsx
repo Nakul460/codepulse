@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar";
 import CreateProjectDialog from "@/components/create-project-dialog";
 import {
   Breadcrumb,
@@ -12,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -28,11 +28,17 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { InvitationBanner } from "@/components/invitation-banner";
 import { useOrganizations } from "@/components/organization-provider";
 import { toast } from "@/components/ui/toast";
 import { createProject, listProjects } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
-import { FolderCodeIcon, ArchiveIcon, Building2Icon } from "lucide-react";
+import {
+  FolderCodeIcon,
+  ArchiveIcon,
+  Building2Icon,
+  CircleAlertIcon,
+} from "lucide-react";
 import type { ProjectRecord, ProjectType } from "@/types/project-type";
 import { DataTable } from "./data-table";
 import { getColumns } from "./columns";
@@ -48,7 +54,13 @@ export default function Page() {
   const showArchived = searchParams.get("archived") === "1";
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const [loadError, setLoadError] = useState<{
+    orgId: string;
+    archived: boolean;
+    retryVersion: number;
+    message: string;
+  } | null>(null);
   // Keyed by org so switching organizations can never show the previous
   // organization's rows, and so "loading" is derived rather than stored.
   const [loaded, setLoaded] = useState<{
@@ -88,7 +100,6 @@ export default function Page() {
     // Arrow function, not a declaration: a hoisted declaration would lose the
     // `orgId` non-null narrowing above.
     const load = async () => {
-      setIsFetching(true);
       try {
         const { projects } = await listProjects(
           { archived: showArchived, organizationId: orgId },
@@ -99,22 +110,20 @@ export default function Page() {
         if (controller.signal.aborted) {
           return;
         }
-        toast.add({
-          type: "error",
-          description:
+        setLoadError({
+          orgId,
+          archived: showArchived,
+          retryVersion,
+          message:
             error instanceof Error ? error.message : "Could not load projects",
         });
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsFetching(false);
-        }
       }
     };
 
     void load();
 
     return () => controller.abort();
-  }, [showArchived, activeOrgId]);
+  }, [showArchived, activeOrgId, retryVersion]);
 
   // Stale-while-revalidating: keep showing the current org's rows while a new
   // filter or org loads, but never another org's rows.
@@ -123,8 +132,14 @@ export default function Page() {
     loaded.orgId === activeOrgId &&
     loaded.archived === showArchived;
 
+  const hasLoadError =
+    loadError !== null &&
+    loadError.orgId === activeOrgId &&
+    loadError.archived === showArchived &&
+    loadError.retryVersion === retryVersion;
+
   const projectData = matchesLoaded ? loaded.projects : EMPTY_PROJECTS;
-  const isLoading = Boolean(activeOrgId) && (isFetching || !matchesLoaded);
+  const isLoading = Boolean(activeOrgId) && !matchesLoaded && !hasLoadError;
 
   const handleChanged = useCallback((project: ProjectRecord) => {
     setLoaded((current) =>
@@ -188,7 +203,6 @@ export default function Page() {
       );
       toast.add({ type: "success", description: "New project created" });
     } catch (error) {
-      setIsOpen(false);
       toast.add({
         type: "error",
         description:
@@ -199,9 +213,8 @@ export default function Page() {
 
   return (
     <>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <SidebarInset id="main-content">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:z-auto md:border-b-0 md:bg-transparent md:px-0 md:backdrop-blur-none transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -224,7 +237,32 @@ export default function Page() {
           </div>
         </header>
 
-        <main id="main-content" className="flex flex-1 flex-col gap-6 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+          <InvitationBanner />
+
+          {hasLoadError && (
+            <Alert variant="destructive">
+              <CircleAlertIcon aria-hidden="true" />
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <AlertTitle>Projects couldn’t load</AlertTitle>
+                  <AlertDescription className="break-words">
+                    {loadError?.message ?? "Could not load projects."} You can
+                    retry without losing this page.
+                  </AlertDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-fit shrink-0"
+                  onClick={() => setRetryVersion((current) => current + 1)}
+                >
+                  Try again
+                </Button>
+              </div>
+            </Alert>
+          )}
+
           <div className="flex flex-wrap items-start justify-between gap-4 pt-2">
               <div className="flex flex-col gap-1">
                 <h1 className="font-heading text-2xl font-semibold tracking-tight text-balance">
@@ -298,7 +336,7 @@ export default function Page() {
                 </div>
               ))}
             </div>
-          ) : !activeOrg ? (
+          ) : hasLoadError && !matchesLoaded ? null : !activeOrg ? (
             <div className="rounded-xl border">
               <Empty>
                 <EmptyHeader>
@@ -341,7 +379,7 @@ export default function Page() {
           ) : (
             <DataTable columns={columns} data={projectData} />
           )}
-        </main>
+        </div>
       </SidebarInset>
     </>
   );

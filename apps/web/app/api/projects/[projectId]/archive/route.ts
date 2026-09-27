@@ -2,15 +2,22 @@ import { NextResponse } from "next/server";
 import { projectModel } from "@/db/schema";
 import { connectProjectDB } from "@/db/db";
 import { assertCanEdit, getProject, logActivity } from "@/lib/projects";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  toErrorResponse,
+} from "@/lib/session";
 
 type Context = RouteContext<"/api/projects/[projectId]/archive">;
 
 /** Archive a project. Soft delete: sets archivedAt, hides it from the default list. */
 export async function POST(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId } = await ctx.params;
 
     const existing = await assertCanEdit(projectId, user);
@@ -42,9 +49,11 @@ export async function POST(request: Request, ctx: Context) {
 
 /** Restore a previously archived project. */
 export async function DELETE(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId } = await ctx.params;
 
     const existing = await assertCanEdit(projectId, user);

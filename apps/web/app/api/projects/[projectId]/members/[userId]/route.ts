@@ -7,15 +7,24 @@ import {
   listMembers,
   logActivity,
 } from "@/lib/projects";
-import { ForbiddenError, NotFoundError, requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  ForbiddenError,
+  NotFoundError,
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  toErrorResponse,
+} from "@/lib/session";
 import { updateMemberSchema } from "@/lib/validation";
 
 type Context = RouteContext<"/api/projects/[projectId]/members/[userId]">;
 
 export async function PATCH(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId, userId } = await ctx.params;
 
     await assertCanManageMembers(projectId, user);
@@ -65,9 +74,11 @@ export async function PATCH(request: Request, ctx: Context) {
 }
 
 export async function DELETE(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId, userId } = await ctx.params;
 
     await assertCanManageMembers(projectId, user);

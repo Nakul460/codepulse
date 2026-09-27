@@ -1,0 +1,34 @@
+{
+  "name": "@codepulse/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "start": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@codepulse/shared": "workspace:*",
+    "bullmq": "^5.34.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "ioredis": "^5.4.1",
+    "mongoose": "^9.10.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20",
+    "eslint": "^9",
+    "tsx": "^4.19.2",
+    "typescript": "^5",
+    "typescript-eslint": "^8.70.1"
+  }
+}

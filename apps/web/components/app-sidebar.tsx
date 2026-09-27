@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/sidebar"
 import {
   FolderKanbanIcon,
+  CircleDotIcon,
+  GitForkIcon,
   Settings2Icon,
+  UserRoundIcon,
 } from "lucide-react"
 
 export function AppSidebar({
@@ -34,15 +37,19 @@ export function AppSidebar({
 
   const items = [
     { title: "Projects", href: `/dashboard${orgQuery}`, icon: FolderKanbanIcon, base: "/dashboard" },
+    { title: "Issues", href: `/dashboard/issues${orgQuery}`, icon: CircleDotIcon, base: "/dashboard/issues" },
+    { title: "Repositories", href: `/dashboard/repositories${orgQuery}`, icon: GitForkIcon, base: "/dashboard/repositories" },
     { title: "Settings", href: `/dashboard/settings${orgQuery}`, icon: Settings2Icon, base: "/dashboard/settings" },
+    // Account is about *you*, not the active org, so it deliberately carries no
+    // `?org=` query: those pages are session-scoped and must not change when the
+    // org switcher does.
+    { title: "Account", href: "/dashboard/account", icon: UserRoundIcon, base: "/dashboard/account" },
   ]
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <SidebarMenu>
-          <OrganizationSwitcher />
-        </SidebarMenu>
+        <OrganizationSwitcher />
       </SidebarHeader>
 
       <SidebarContent className="overscroll-contain">
@@ -56,7 +63,9 @@ export function AppSidebar({
                     render={<Link href={href} />}
                     isActive={
                       pathname === base ||
-                      (base !== "/dashboard" && pathname.startsWith(`${base}/`))
+                      (base === "/dashboard"
+                        ? pathname.startsWith("/dashboard/projects/")
+                        : pathname.startsWith(`${base}/`))
                     }
                   >
                     <Icon aria-hidden="true" />

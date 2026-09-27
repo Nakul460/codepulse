@@ -11,6 +11,7 @@ import {
   NotFoundError,
   type SessionUser,
 } from "@/lib/session";
+import { projectCan } from "@codepulse/shared";
 import type { MemberRole } from "@/lib/project-status";
 
 /**
@@ -41,16 +42,33 @@ export async function resolveProjectRole(
   return (projectMembership?.role as MemberRole) ?? null;
 }
 
+/*
+ * Thin aliases over the shared permission matrix.
+ *
+ * These names predate `packages/shared/src/permissions.ts` and are kept because
+ * call sites read better as `canEdit(role)` than `projectCan(role, "edit")`.
+ * They deliberately contain **no role logic** — the matrix in `shared` is the
+ * single source of truth, and these just forward to it, so the web app, the API
+ * service and the UI cannot disagree about what a role may do.
+ */
+export function canView(role: MemberRole | null) {
+  return projectCan(role, "view");
+}
+
 export function canEdit(role: MemberRole | null) {
-  return role === "owner" || role === "editor";
+  return projectCan(role, "edit");
+}
+
+export function canArchive(role: MemberRole | null) {
+  return projectCan(role, "archive");
 }
 
 export function canManageMembers(role: MemberRole | null) {
-  return role === "owner";
+  return projectCan(role, "manage_members");
 }
 
 export function canDelete(role: MemberRole | null) {
-  return role === "owner";
+  return projectCan(role, "delete");
 }
 
 function isValidObjectId(id: string) {

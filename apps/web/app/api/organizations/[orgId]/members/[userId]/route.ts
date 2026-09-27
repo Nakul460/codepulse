@@ -12,7 +12,8 @@ import {
   ForbiddenError,
   NotFoundError,
   assertSameOrigin,
-  requireUser,
+  assertWriteScope,
+  requireAuth,
   toErrorResponse,
 } from "@/lib/session";
 import { updateOrgMemberSchema } from "@/lib/validation";
@@ -22,7 +23,9 @@ type Context = RouteContext<"/api/organizations/[orgId]/members/[userId]">;
 export async function PATCH(request: Request, ctx: Context) {
   try {
     assertSameOrigin(request);
-    const admin = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const admin = auth.user;
     const { orgId, userId } = await ctx.params;
 
     await assertOrgAdmin(orgId, admin);
@@ -66,7 +69,11 @@ export async function PATCH(request: Request, ctx: Context) {
     await logOrgActivity({
       organizationId: orgId,
       actor: admin,
-      action: "org.role_changed",
+      // Was "org.role_changed", which is not in ORG_ACTIVITY_ACTIONS. The org
+      // audit schema stores `action` as a free String rather than an enum, so
+      // nothing rejected it and the mismatch stayed invisible — the action just
+      // never matched the documented list.
+      action: "org.member_role_changed",
       target: member.email,
       metadata: { from: member.role, to: parsed.data.role },
     });
@@ -82,7 +89,9 @@ export async function PATCH(request: Request, ctx: Context) {
 export async function DELETE(request: Request, ctx: Context) {
   try {
     assertSameOrigin(request);
-    const admin = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const admin = auth.user;
     const { orgId, userId } = await ctx.params;
 
     await assertOrgAdmin(orgId, admin);

@@ -10,6 +10,7 @@ import {
   NotFoundError,
   type SessionUser,
 } from "@/lib/session";
+import { orgCan, type OrgPermission } from "@codepulse/shared";
 import type { OrgRole } from "@/lib/project-status";
 import { slugify } from "@/lib/slug";
 
@@ -169,10 +170,23 @@ export async function getOrganization(
   };
 }
 
-export async function assertOrgAdmin(
+/**
+ * Throws unless the user holds `permission` in this organization.
+ *
+ * The failure is deliberately a **404 "Organization not found"** rather than a
+ * 403, and that is the single most important detail here: a 403 would confirm
+ * the organization exists to someone who is not in it, turning the route table
+ * into a membership oracle. So a non-member, a plain member asking for an
+ * admin action, and a caller with a malformed id all get the same answer.
+ *
+ * The permission itself comes from the shared matrix — this function does not
+ * decide who may do what, it only resolves the caller's role and asks.
+ */
+export async function assertOrgPermission(
   organizationId: string,
   user: SessionUser,
-) {
+  permission: OrgPermission,
+): Promise<OrgRole> {
   // Without this a malformed id surfaces as a CastError (500) instead of the
   // 404 that keeps org existence hidden from non-members.
   if (!isValidObjectId(organizationId)) {
@@ -181,12 +195,36 @@ export async function assertOrgAdmin(
 
   const role = await getOrgRole(organizationId, user.id);
 
-  if (role !== "admin") {
+  if (!orgCan(role, permission)) {
     // Same reasoning as projects: do not confirm the org exists to outsiders.
     throw new NotFoundError("Organization not found");
   }
 
-  return role;
+  return role as OrgRole;
+}
+
+/**
+ * The previous single admin gate, kept as a named alias so the diff against the
+ * original `assertOrgAdmin` reads as intent rather than a rename sweep.
+ *
+ * It is now expressed as a **permission**, not a role comparison, so introducing
+ * a new role that can manage members (a "manager", say) does not require
+ * touching every call site. Today only `admin` holds `manage_members`, so the
+ * behaviour is identical to the old `role !== "admin"` check.
+ */
+export async function assertOrgAdmin(
+  organizationId: string,
+  user: SessionUser,
+) {
+  return assertOrgPermission(organizationId, user, "manage_members");
+}
+
+/** Same 404-not-403 rule as `assertOrgPermission`, for read-only access. */
+export async function assertOrgViewer(
+  organizationId: string,
+  user: SessionUser,
+): Promise<OrgRole> {
+  return assertOrgPermission(organizationId, user, "view");
 }
 
 export async function listOrgMembers(

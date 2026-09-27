@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProject, listActivity } from "@/lib/projects";
-import { requireUser, toErrorResponse } from "@/lib/session";
+import {
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 
 type Context = RouteContext<"/api/projects/[projectId]/activity">;
 
 export async function GET(request: NextRequest, ctx: Context) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     const { projectId } = await ctx.params;
 
     await getProject(projectId, user);

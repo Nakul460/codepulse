@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar";
+import { projectCan } from "@codepulse/shared";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import {
   Breadcrumb,
@@ -67,6 +67,8 @@ export default function ProjectPage() {
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   // The URL is the source of truth for the edit dialog, so no effect is
   // needed to open it from a link.
@@ -88,46 +90,44 @@ export default function ProjectPage() {
       setIsLoading(true);
       setIsMembersLoading(true);
       setIsActivityLoading(true);
+      setLoadError(false);
 
       try {
-        const [{ project: loaded }, { activity: loadedActivity }] =
-          await Promise.all([
-            getProject(projectId, controller.signal),
-            listActivity(projectId, controller.signal),
-          ]);
-
+        const { project: loaded } = await getProject(projectId, controller.signal);
         setProject(loaded);
-        setActivity(loadedActivity);
 
-        // The roster is owner-only on the server (it exposes collaborator
-        // emails), so it is only requested once we know the role. Fetching it
-        // up front would 403 for editors and viewers.
-        if (loaded.role === "owner") {
-          const { members: loadedMembers } = await listMembers(
-            projectId,
-            controller.signal,
-          );
-          setMembers(loadedMembers);
-        } else {
-          setMembers([]);
-        }
+        // Optional panels load independently so one unavailable endpoint does
+        // not hide the project overview.
+        void listActivity(projectId, controller.signal)
+          .then(({ activity: loadedActivity }) => setActivity(loadedActivity))
+          .catch(() => {})
+          .finally(() => {
+            if (!controller.signal.aborted) setIsActivityLoading(false);
+          });
+
+        // Member email addresses are owner-only, so request the roster after
+        // the project role is known.
+        const membersRequest = loaded.role === "owner"
+          ? listMembers(projectId, controller.signal)
+          : Promise.resolve({ members: [] as ProjectMemberRecord[] });
+        void membersRequest
+          .then(({ members: loadedMembers }) => setMembers(loadedMembers))
+          .catch(() => {})
+          .finally(() => {
+            if (!controller.signal.aborted) setIsMembersLoading(false);
+          });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        toast.add({
-          type: "error",
-          description:
-            error instanceof Error ? error.message : "Could not load project",
-        });
         if (error instanceof Error && /not found/i.test(error.message)) {
           router.replace("/dashboard");
+        } else {
+          setLoadError(true);
         }
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
-          setIsMembersLoading(false);
-          setIsActivityLoading(false);
         }
       }
     }
@@ -135,7 +135,7 @@ export default function ProjectPage() {
     load();
 
     return () => controller.abort();
-  }, [projectId, router]);
+  }, [projectId, retryVersion, router]);
 
   const refreshActivity = useCallback(async () => {
     try {
@@ -157,8 +157,7 @@ export default function ProjectPage() {
   if (isLoading) {
     return (
       <>
-        <AppSidebar />
-        <SidebarInset>
+        <SidebarInset id="main-content">
           <div className="flex flex-col gap-6 p-6">
             <Skeleton className="h-8 w-64" />
             <Skeleton className="h-40 w-full" />
@@ -171,15 +170,21 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <>
-        <AppSidebar />
-        <SidebarInset>
+        <SidebarInset id="main-content">
           <div className="flex flex-col items-start gap-4 p-6">
             <h1 className="font-heading text-xl font-semibold text-balance">
               Project unavailable
             </h1>
             <p className="text-sm text-muted-foreground">
-              This project may have been deleted, or you may not have access.
+              {loadError
+                ? "We couldn’t load this project. Check your connection and try again."
+                : "This project may have been deleted, or you may not have access."}
             </p>
+            {loadError && (
+              <Button onClick={() => setRetryVersion((version) => version + 1)}>
+                Try again
+              </Button>
+            )}
             <Button render={<Link href="/dashboard" />}>
               <ArrowLeftIcon aria-hidden="true" />
               Back to projects
@@ -190,15 +195,16 @@ export default function ProjectPage() {
     );
   }
 
-  const canEdit = project.role === "owner" || project.role === "editor";
-  const canManageMembers = project.role === "owner";
+  // Shared permission matrix, not inline role comparisons — see the note in
+  // project-row-actions.tsx.
+  const canEdit = projectCan(project.role, "edit");
+  const canManageMembers = projectCan(project.role, "manage_members");
   const isArchived = project.archivedAt !== null;
 
   return (
     <>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <SidebarInset id="main-content">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:z-auto md:border-b-0 md:bg-transparent md:px-0 md:backdrop-blur-none transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -221,7 +227,7 @@ export default function ProjectPage() {
           </div>
         </header>
 
-        <main id="main-content" className="flex flex-1 flex-col gap-6 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
           <div className="flex flex-wrap items-start justify-between gap-4 pt-2">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -377,7 +383,7 @@ export default function ProjectPage() {
               <ActivityFeed activity={activity} isLoading={isActivityLoading} />
             </CardContent>
           </Card>
-        </main>
+        </div>
       </SidebarInset>
 
       <EditProjectDialog

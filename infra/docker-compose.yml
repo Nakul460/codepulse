@@ -1,0 +1,29 @@
+# Local backing services for the API service and worker.
+#
+#   pnpm infra:up      # start
+#   pnpm infra:down    # stop
+#
+# MongoDB is intentionally NOT here: the app uses MongoDB Atlas, configured via
+# PROJECT_DATABASE_URL in the repo-root .env. Add a local mongodb service only
+# if you want to run without Atlas.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: codepulse-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # Appendonly so queued jobs survive a container restart. Without it a
+    # restart silently drops everything in flight.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis-data:

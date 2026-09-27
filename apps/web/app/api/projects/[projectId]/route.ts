@@ -8,14 +8,20 @@ import {
   getProject,
   logActivity,
 } from "@/lib/projects";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 import { updateProjectSchema } from "@/lib/validation";
 
 type Context = RouteContext<"/api/projects/[projectId]">;
 
-export async function GET(_request: Request, ctx: Context) {
+export async function GET(request: Request, ctx: Context) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     const { projectId } = await ctx.params;
     const project = await getProject(projectId, user);
 
@@ -36,9 +42,11 @@ const TRACKED_FIELDS = [
 ] as const;
 
 export async function PATCH(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId } = await ctx.params;
 
     // The assert returns the authorized project, so its organizationId can be
@@ -133,9 +141,11 @@ export async function PATCH(request: Request, ctx: Context) {
 }
 
 export async function DELETE(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { projectId } = await ctx.params;
 
     const { organizationId } = await assertCanDelete(projectId, user);

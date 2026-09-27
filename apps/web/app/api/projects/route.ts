@@ -4,12 +4,18 @@ import { projectModel, projectMemberModel } from "@/db/schema";
 import { connectProjectDB } from "@/db/db";
 import { listProjects, logActivity, serializeProject } from "@/lib/projects";
 import { getOrgRole } from "@/lib/organizations";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 import { createProjectSchema } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     const params = request.nextUrl.searchParams;
     const archived = params.get("archived") === "true";
     const organizationId = params.get("orgId") ?? undefined;
@@ -24,9 +30,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const parsed = createProjectSchema.safeParse(await request.json());
 
     if (!parsed.success) {

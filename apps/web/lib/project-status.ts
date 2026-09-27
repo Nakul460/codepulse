@@ -1,57 +1,29 @@
-export const PROJECT_STATUSES = [
-  "ongoing",
-  "completed",
-  "upcoming",
-  "on hold",
-  "behind schedule",
-] as const;
+/**
+ * Re-exported from `@codepulse/shared` so the API service and the web app
+ * cannot disagree about roles, statuses or activity actions. The date coercion
+ * helpers below are form-only and stay here.
+ */
 
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+export {
+  ACTIVITY_ACTIONS,
+  ASSIGNABLE_ROLES,
+  MEMBER_ROLES,
+  MEMBER_ROLE_LABELS,
+  ORG_ACTIVITY_ACTIONS,
+  ORG_ROLES,
+  ORG_ROLE_LABELS,
+  PROJECT_STATUSES,
+  STATUS_LABELS,
+  statusLabel,
+} from "@codepulse/shared";
 
-export const STATUS_LABELS: Record<ProjectStatus, string> = {
-  ongoing: "Ongoing",
-  completed: "Completed",
-  upcoming: "Upcoming",
-  "on hold": "On hold",
-  "behind schedule": "Behind schedule",
-};
-
-export const MEMBER_ROLES = ["owner", "editor", "viewer"] as const;
-export type MemberRole = (typeof MEMBER_ROLES)[number];
-
-export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
-  owner: "Owner",
-  editor: "Editor",
-  viewer: "Viewer",
-};
-
-export const ASSIGNABLE_ROLES = MEMBER_ROLES.filter(
-  (role) => role !== "owner",
-) as readonly Exclude<MemberRole, "owner">[];
-
-export const ORG_ROLES = ["admin", "member"] as const;
-export type OrgRole = (typeof ORG_ROLES)[number];
-
-export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  admin: "Admin",
-  member: "Member",
-};
-
-export const ACTIVITY_ACTIONS = [
-  "project.created",
-  "project.updated",
-  "project.archived",
-  "project.restored",
-  "project.deleted",
-  "member.added",
-  "member.removed",
-  "member.role_changed",
-] as const;
-export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
-
-export function statusLabel(status: string) {
-  return STATUS_LABELS[status as ProjectStatus] ?? status;
-}
+export type {
+  ActivityAction,
+  MemberRole,
+  OrgActivityAction,
+  OrgRole,
+  ProjectStatus,
+} from "@codepulse/shared";
 
 export function toDate(value: string | Date | null | undefined) {
   if (!value) {

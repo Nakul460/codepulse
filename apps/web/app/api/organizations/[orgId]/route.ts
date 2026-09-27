@@ -11,14 +11,20 @@ import {
   assertOrgAdmin,
   logOrgActivity,
 } from "@/lib/organizations";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 import { updateOrganizationSchema } from "@/lib/validation";
 
 type Context = RouteContext<"/api/organizations/[orgId]">;
 
-export async function GET(_request: Request, ctx: Context) {
+export async function GET(request: Request, ctx: Context) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     const { orgId } = await ctx.params;
 
     return NextResponse.json({
@@ -31,9 +37,11 @@ export async function GET(_request: Request, ctx: Context) {
 }
 
 export async function PATCH(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { orgId } = await ctx.params;
 
     await assertOrgAdmin(orgId, user);
@@ -85,9 +93,11 @@ export async function PATCH(request: Request, ctx: Context) {
 }
 
 export async function DELETE(request: Request, ctx: Context) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const { orgId } = await ctx.params;
 
     await assertOrgAdmin(orgId, user);

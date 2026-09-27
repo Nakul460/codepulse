@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOrganizations } from "@/components/organization-provider";
-import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,16 +31,25 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import {
-  addOrgMember,
   deleteOrganization,
+  inviteOrgMember,
+  listOrgInvitations,
   listOrgMembers,
+  revokeOrgInvitation,
   removeOrgMember,
   updateOrgMemberRole,
   updateOrganization,
 } from "@/lib/api";
 import { ORG_ROLE_LABELS } from "@/lib/project-status";
 import { ORG_NAME_MAX } from "@/lib/validation";
-import { Building2Icon, PlusIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
+import {
+  Building2Icon,
+  MailIcon,
+  PlusIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import type { OrgInvitationRecord } from "@/lib/api";
 import type { OrgMemberRecord, OrgRole } from "@/types/project-type";
 
 function SettingsContent() {
@@ -55,6 +63,11 @@ function SettingsContent() {
     members: OrgMemberRecord[];
     failed: boolean;
   } | null>(null);
+  const [invitationsState, setInvitationsState] = useState<{
+    orgId: string;
+    invitations: OrgInvitationRecord[];
+  } | null>(null);
+  const [revokingInvitationId, setRevokingInvitationId] = useState<string | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -82,6 +95,8 @@ function SettingsContent() {
     isAdmin && (!activeOrgId || membersState?.orgId !== activeOrgId);
   const members =
     membersState?.orgId === activeOrgId ? membersState.members : [];
+  const invitations =
+    invitationsState?.orgId === activeOrgId ? invitationsState.invitations : [];
 
   useEffect(() => {
     // Only admins may read the member list, so don't ask for it otherwise.
@@ -104,6 +119,34 @@ function SettingsContent() {
           type: "error",
           description:
             error instanceof Error ? error.message : "Could not load members",
+        });
+      });
+
+    return () => controller.abort();
+  }, [activeOrgId, isAdmin]);
+
+  useEffect(() => {
+    if (!activeOrgId || !isAdmin) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    listOrgInvitations(activeOrgId, controller.signal)
+      .then(({ invitations: loaded }) =>
+        setInvitationsState({ orgId: activeOrgId, invitations: loaded }),
+      )
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setInvitationsState({ orgId: activeOrgId, invitations: [] });
+        toast.add({
+          type: "error",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Could not load pending invitations",
         });
       });
 
@@ -139,26 +182,59 @@ function SettingsContent() {
 
     setIsInviting(true);
     try {
-      const { members: updated } = await addOrgMember(
-        activeOrgId,
-        inviteEmail.trim(),
+      const { invitation } = await inviteOrgMember(activeOrgId, inviteEmail.trim());
+      setInvitationsState((previous) =>
+        previous?.orgId === activeOrgId
+          ? { orgId: activeOrgId, invitations: [invitation, ...previous.invitations] }
+          : { orgId: activeOrgId, invitations: [invitation] },
       );
-      setMembersState({ orgId: activeOrgId, members: updated, failed: false });
       setIsInviteOpen(false);
       setInviteEmail("");
       toast.add({
         type: "success",
-        description:
-          "Member added. Promote them to admin from the list if needed.",
+        // Honest about what happened: nothing was added yet. The member appears
+        // in the list only once they accept, so saying "Member added" here would
+        // be a lie the admin then has to debug.
+        description: `Invitation sent to ${invitation.email}. They join once they accept.`,
       });
     } catch (error) {
       toast.add({
         type: "error",
         description:
-          error instanceof Error ? error.message : "Could not add member",
+          error instanceof Error ? error.message : "Could not send invitation",
       });
     } finally {
       setIsInviting(false);
+    }
+  }
+
+  async function handleRevokeInvitation(invitationId: string, email: string) {
+    if (!activeOrgId) {
+      return;
+    }
+
+    setRevokingInvitationId(invitationId);
+    try {
+      await revokeOrgInvitation(activeOrgId, invitationId);
+      setInvitationsState((previous) =>
+        previous?.orgId === activeOrgId
+          ? {
+              orgId: activeOrgId,
+              invitations: previous.invitations.filter(
+                (invitation) => invitation.id !== invitationId,
+              ),
+            }
+          : previous,
+      );
+      toast.add({ type: "success", description: `Invitation to ${email} revoked.` });
+    } catch (error) {
+      toast.add({
+        type: "error",
+        description:
+          error instanceof Error ? error.message : "Could not revoke that invitation",
+      });
+    } finally {
+      setRevokingInvitationId(null);
     }
   }
 
@@ -248,8 +324,7 @@ function SettingsContent() {
   if (isLoading) {
     return (
       <>
-        <AppSidebar />
-        <SidebarInset>
+        <SidebarInset id="main-content">
           <div className="flex flex-col gap-6 p-6">
             <Skeleton className="h-8 w-64" />
             <Skeleton className="h-40 w-full" />
@@ -262,8 +337,7 @@ function SettingsContent() {
   if (!activeOrg) {
     return (
       <>
-        <AppSidebar />
-        <SidebarInset>
+        <SidebarInset id="main-content">
           <div className="rounded-xl border p-6">
             <Empty>
               <EmptyHeader>
@@ -284,9 +358,8 @@ function SettingsContent() {
 
   return (
     <>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+      <SidebarInset id="main-content">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:z-auto md:border-b-0 md:bg-transparent md:backdrop-blur-none">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
           <h1 className="font-heading text-lg font-semibold tracking-tight text-balance">
@@ -294,7 +367,7 @@ function SettingsContent() {
           </h1>
         </header>
 
-        <main id="main-content" className="flex flex-1 flex-col gap-6 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
           <Card>
             <CardHeader>
               <CardTitle>Organization name</CardTitle>
@@ -347,14 +420,15 @@ function SettingsContent() {
                       render={<Button variant="outline" size="sm" />}
                     >
                       <PlusIcon aria-hidden="true" />
-                      Add member
+                      Invite member
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-sm">
                       <form onSubmit={handleInvite}>
                         <DialogHeader>
-                          <DialogTitle>Add member</DialogTitle>
+                          <DialogTitle>Invite member</DialogTitle>
                           <DialogDescription>
-                            The person needs an existing CodePulse account.
+                            We email a one-time link. They join when they accept
+                            it.
                           </DialogDescription>
                         </DialogHeader>
 
@@ -374,7 +448,8 @@ function SettingsContent() {
                             />
                             <FieldDescription>
                               They join as a member. Promote them to admin below
-                              if they need to manage the organization.
+                              if they need to manage the organization. They do
+                              not need an account yet — accepting creates one.
                             </FieldDescription>
                           </Field>
                         </div>
@@ -391,7 +466,7 @@ function SettingsContent() {
                             type="submit"
                             disabled={isInviting || !inviteEmail.trim()}
                           >
-                            {isInviting ? "Adding…" : "Add Member"}
+                            {isInviting ? "Sending…" : "Send invitation"}
                           </Button>
                         </DialogFooter>
                       </form>
@@ -489,6 +564,65 @@ function SettingsContent() {
                   ))}
                 </ul>
               )}
+
+              {isAdmin && invitations.length > 0 ? (
+                <div className="mt-6 flex flex-col gap-2 border-t pt-4">
+                  <h3 className="text-sm font-medium">Pending invitations</h3>
+                  <ul className="flex flex-col divide-y">
+                    {invitations.map((invitation) => {
+                      const { isExpired: expired } = invitation;
+
+                      return (
+                        <li
+                          key={invitation.id}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
+                        >
+                          <MailIcon
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <span className="font-medium">{invitation.email}</span>
+                          <span
+                            className={
+                              expired
+                                ? "text-xs text-destructive"
+                                : "text-xs text-muted-foreground"
+                            }
+                          >
+                            {expired
+                              ? "expired"
+                              : `expires ${new Date(
+                                  invitation.expiresAt,
+                                ).toLocaleDateString()}`}
+                          </span>
+                          <Button
+                            className="ml-auto"
+                            variant="ghost"
+                            size="sm"
+                            disabled={revokingInvitationId === invitation.id}
+                            onClick={() =>
+                              void handleRevokeInvitation(
+                                invitation.id,
+                                invitation.email,
+                              )
+                            }
+                          >
+                            {revokingInvitationId === invitation.id
+                              ? "Revoking…"
+                              : expired
+                                ? "Remove"
+                                : "Revoke"}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p className="text-xs text-muted-foreground">
+                    Expired invitations can be removed here, or re-sent by
+                    inviting the same address again.
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -598,7 +732,7 @@ function SettingsContent() {
               </CardContent>
             </Card>
           )}
-        </main>
+        </div>
       </SidebarInset>
     </>
   );

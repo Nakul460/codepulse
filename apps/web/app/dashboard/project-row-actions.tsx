@@ -10,6 +10,7 @@ import {
   ArchiveRestoreIcon,
   Trash2Icon,
 } from "lucide-react";
+import { projectCan } from "@codepulse/shared";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,8 +48,12 @@ export function ProjectRowActions({
   const isArchived = project.archivedAt !== null;
   // Fall back so the accessible name is never "Actions for ".
   const label = project.projectName?.trim() || "Untitled project";
-  const canEdit = project.role === "owner" || project.role === "editor";
-  const canDelete = project.role === "owner";
+  // From the shared permission matrix, not a role comparison written here.
+  // These used to be inline `project.role === "owner"` checks, which meant a
+  // change to what a role could do had to be made in three places (here, the
+  // project page, and the API service) and a miss was invisible.
+  const canEdit = projectCan(project.role, "edit");
+  const canDelete = projectCan(project.role, "delete");
 
   async function run(action: () => Promise<ProjectRecord | undefined>) {
     setIsPending(true);

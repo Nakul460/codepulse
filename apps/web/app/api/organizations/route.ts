@@ -3,12 +3,18 @@ import { z } from "zod";
 import { connectProjectDB } from "@/db/db";
 import { organizationMemberModel, organizationModel } from "@/db/schema";
 import { listOrganizations, uniqueSlug } from "@/lib/organizations";
-import { requireUser, toErrorResponse, assertSameOrigin } from "@/lib/session";
+import {
+  assertSameOrigin,
+  assertWriteScope,
+  requireAuth,
+  requireUser,
+  toErrorResponse,
+} from "@/lib/session";
 import { createOrganizationSchema } from "@/lib/validation";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(request);
     return NextResponse.json({
       organizations: await listOrganizations(user),
     });
@@ -19,9 +25,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    try {
+  try {
     assertSameOrigin(request);
-      const user = await requireUser();
+    const auth = await requireAuth(request);
+    assertWriteScope(auth);
+    const user = auth.user;
     const parsed = createOrganizationSchema.safeParse(await request.json());
 
     if (!parsed.success) {

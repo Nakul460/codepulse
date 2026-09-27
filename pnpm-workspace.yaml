@@ -1,3 +1,14 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Postinstall scripts are denied by default. Only these two are allowed:
+#   esbuild           - its postinstall fetches the platform binary that tsx
+#                       (the API service's dev runner) needs to start.
+#   msgpackr-extract  - optional native codec for the Redis client. Degrades to
+#                       a pure-JS implementation if it does not build.
 allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
   sharp: false
   unrs-resolver: false
