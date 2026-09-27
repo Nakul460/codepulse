@@ -23,6 +23,11 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-status-ongoing: var(--status-ongoing);
+  --color-status-completed: var(--status-completed);
+  --color-status-upcoming: var(--status-upcoming);
+  --color-status-hold: var(--status-hold);
+  --color-status-late: var(--status-late);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -72,6 +77,11 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  --status-ongoing: oklch(0.55 0.13 155);
+  --status-completed: oklch(0.52 0.02 260);
+  --status-upcoming: oklch(0.52 0.14 255);
+  --status-hold: oklch(0.58 0.12 70);
+  --status-late: oklch(0.55 0.19 25);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -107,6 +117,11 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  --status-ongoing: oklch(0.78 0.16 158);
+  --status-completed: oklch(0.7 0.02 260);
+  --status-upcoming: oklch(0.74 0.13 255);
+  --status-hold: oklch(0.8 0.13 75);
+  --status-late: oklch(0.72 0.17 25);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -126,5 +141,15 @@
   }
   html {
     @apply font-sans;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
