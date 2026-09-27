@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# The template documents the two database URLs and the EMAIL_FROM caveat, so it
+# has to stay tracked. Without this line `.env*` above silently excludes it.
+!.env.example
 
 # vercel
 .vercel
