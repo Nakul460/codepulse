@@ -3,11 +3,12 @@ import express from "express";
 import { loadRootEnv } from "./env.js";
 import { webhookRouter } from "./ingest/webhook.js";
 import { internalRouter } from "./internal.js";
+import { apiMongoose, connect } from "./db.js";
 
 loadRootEnv();
 
 const app = express();
-const port = Number(process.env.API_PORT ?? 4000);
+const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 
 // The browser only ever talks to the Next.js origin, which proxies /api/ingest
 // here. This is belt-and-braces for local development, where the two run on
@@ -41,13 +42,17 @@ app.use((_request, response) => {
   response.status(404).json({ message: "Not found" });
 });
 
-const server = app.listen(port, () => {
+await connect();
+
+const server = app.listen(port, "0.0.0.0", () => {
   console.log(`[api] listening on http://localhost:${port}`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     console.log(`[api] ${signal} received, closing`);
-    server.close(() => process.exit(0));
+    server.close(() => {
+      void apiMongoose.connection.close().finally(() => process.exit(0));
+    });
   });
 }

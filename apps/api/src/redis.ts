@@ -20,9 +20,26 @@ export function redisUrl(): string {
 }
 
 export function connectionOptions(): RedisOptions {
-  return { maxRetriesPerRequest: null, enableReadyCheck: false };
+  const url = new URL(redisUrl());
+  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
+    throw new Error("REDIS_URL must use redis:// or rediss://");
+  }
+  const db = url.pathname.slice(1);
+  if (db && !/^\d+$/.test(db)) {
+    throw new Error("REDIS_URL database must be a non-negative integer");
+  }
+  return {
+    host: url.hostname.replace(/^\[|\]$/g, ""),
+    port: Number(url.port || 6379),
+    username: url.username ? decodeURIComponent(url.username) : undefined,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    db: db ? Number(db) : 0,
+    ...(url.protocol === "rediss:" ? { tls: {} } : {}),
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  };
 }
 
 export function createRedis(): Redis {
-  return new Redis(redisUrl(), connectionOptions());
+  return new Redis(connectionOptions());
 }
