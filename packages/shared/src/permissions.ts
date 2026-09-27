@@ -1,9 +1,4 @@
-import {
-  MEMBER_ROLES,
-  ORG_ROLES,
-  type MemberRole,
-  type OrgRole,
-} from "./roles.js";
+import type { MemberRole, OrgRole } from "./roles.js";
 
 /**
  * The permission model — the single source of truth for "may this role do X?".

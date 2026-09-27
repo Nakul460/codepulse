@@ -1,4 +1,12 @@
-import { Resend } from "resend";
+import nodemailer, { type Transporter } from "nodemailer";
+
+const smtpPort = Number(process.env.SMTP_PORT);
+const hasSmtpCredentials = Boolean(
+  process.env.SMTP_USER && process.env.SMTP_PASSWORD,
+);
+const hasPartialSmtpCredentials = Boolean(
+  process.env.SMTP_USER || process.env.SMTP_PASSWORD,
+) && !hasSmtpCredentials;
 
 /**
  * Whether verification emails can actually be delivered.
@@ -9,30 +17,48 @@ import { Resend } from "resend";
  * member management would be unusable — and the account-takeover risk stays
  * live, so it is logged loudly rather than silently ignored.
  *
- * **Both** the sender and the API key are required. Keying this on `EMAIL_FROM`
- * alone was a real gap: with a sender configured but no key, the flag said
- * "email works", so verification was enforced and every signup's mail silently
- * failed inside the swallowed `catch` in `sendEmail` — leaving accounts that
- * could never be verified and no error anywhere. The flag has to describe
- * whether a message can actually leave the process.
+ * The sender, SMTP host, and a valid port are required. Authentication is
+ * optional because local relays commonly do not require it, but a username
+ * and password must be provided together. The flag has to describe whether a
+ * message can actually leave the process; keying it on `EMAIL_FROM` alone
+ * would enforce verification even when delivery cannot work.
  */
 export const emailVerificationAvailable = Boolean(
-  process.env.EMAIL_FROM && process.env.RESEND_API_KEY,
+  process.env.EMAIL_FROM &&
+    process.env.SMTP_HOST &&
+    Number.isInteger(smtpPort) &&
+    smtpPort > 0 &&
+    smtpPort <= 65535 &&
+    !hasPartialSmtpCredentials,
 );
 
-// Built on first use rather than at import time, so importing this module
-// (e.g. from a migration script) does not require RESEND_API_KEY to be set.
-let client: Resend | null = null;
+// Built on first use rather than at import time, so importing this module from
+// a migration or build step does not initialize a network transport.
+let client: Transporter | null = null;
 
 function getClient() {
   if (!client) {
-    const apiKey = process.env.RESEND_API_KEY;
+    const host = process.env.SMTP_HOST;
 
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY is not set");
+    if (!host || !emailVerificationAvailable) {
+      throw new Error("SMTP configuration is incomplete");
     }
 
-    client = new Resend(apiKey);
+    client = nodemailer.createTransport({
+      host,
+      port: smtpPort,
+      // Port 465 uses implicit TLS. Other ports use STARTTLS when the server
+      // advertises it unless SMTP_SECURE explicitly opts into implicit TLS.
+      secure: process.env.SMTP_SECURE
+        ? process.env.SMTP_SECURE === "true"
+        : smtpPort === 465,
+      auth: hasSmtpCredentials
+        ? {
+            user: process.env.SMTP_USER as string,
+            pass: process.env.SMTP_PASSWORD as string,
+          }
+        : undefined,
+    });
   }
 
   return client;
@@ -45,13 +71,11 @@ interface emailType {
 }
 
 export async function sendEmail({ to, text, subject }: emailType) {
-  // Resend's onboarding@resend.dev test sender only delivers to the account
-  // owner's own address, so a real verified sender must be configured.
   const from = process.env.EMAIL_FROM;
 
-  if (!from) {
+  if (!from || !emailVerificationAvailable) {
     console.error(
-      "[email] EMAIL_FROM is not set; refusing to send. Password reset for",
+      "[email] SMTP is not configured; refusing to send. Email for",
       to,
       "cannot be delivered.",
     );
@@ -59,16 +83,12 @@ export async function sendEmail({ to, text, subject }: emailType) {
   }
 
   try {
-    const { error } = await getClient().emails.send({
+    await getClient().sendMail({
       from,
       to,
       subject: subject ?? "Reset your CodePulse password",
       text,
     });
-
-    if (error) {
-      console.error(`[email] delivery to ${to} failed:`, error);
-    }
   } catch (error) {
     // Deliberately swallowed so a mail outage cannot turn into a 500 on the
     // auth endpoint, but logged with a stable prefix so it is alertable.

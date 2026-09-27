@@ -10,6 +10,12 @@ export default defineConfig([
   js.configs.recommended,
   tseslint.configs.recommended,
   {
+    files: ["**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: { process: "readonly", console: "readonly", Buffer: "readonly" },
+    },
+  },
+  {
     files: ["**/*.ts"],
     languageOptions: {
       globals: { process: "readonly", console: "readonly", Buffer: "readonly" },

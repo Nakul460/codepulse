@@ -173,3 +173,4 @@ And turns that into an engineering dashboard
 - `@tanstack/react-table` is **v9**: capabilities are registered in `app/dashboard/table-features.tsx`, and `DataTableFeatures` is the first generic argument of `ColumnDef` / `createColumnHelper`. New table behavior means adding the feature there, not a v8-style plugin.
 - Project status colors are custom `--status-*` tokens in `app/globals.css` (consumed as `text-status-ongoing`, etc.).
 - Style is not uniform: app code uses semicolons, shadcn-generated `components/ui/*` files do not. Match the file you're editing.
+

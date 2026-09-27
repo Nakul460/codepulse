@@ -7,13 +7,13 @@
     "node": ">=22.6.0"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
-    "dev:web": "pnpm --filter @codepulse/web dev",
-    "dev:api": "pnpm --filter @codepulse/api dev",
-    "dev:worker": "pnpm --filter @codepulse/api dev:worker",
+    "dev": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:web": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/web dev",
+    "dev:api": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev",
+    "dev:worker": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev:worker",
     "build": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api build && pnpm --filter @codepulse/web build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @codepulse/shared build && pnpm -r typecheck",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down"
   }

@@ -41,16 +41,17 @@ if (!canDeliverEmail) {
   // permissive behaviour so the app stays usable without a mail provider.
   if (isProduction && !isBuildPhase) {
     throw new Error(
-      "EMAIL_FROM and RESEND_API_KEY must be set in production. Without them " +
+      "EMAIL_FROM and a complete SMTP configuration must be set in production. Without them " +
         "better-auth cannot deliver verification or password-reset email, so " +
         "signups would " +
         "be unverified and a registrant could claim another person's address. " +
-        "Set both EMAIL_FROM and RESEND_API_KEY.",
+        "Set EMAIL_FROM, SMTP_HOST, and SMTP_PORT; set SMTP_USER and " +
+        "SMTP_PASSWORD together when the relay requires authentication.",
     );
   }
 
   console.warn(
-    "[auth] EMAIL_FROM or RESEND_API_KEY is not set — email verification is " +
+    "[auth] EMAIL_FROM or SMTP configuration is incomplete — email verification is " +
       "NOT enforced. Anyone can register an account using someone else's " +
       "address and receive access if it is ever added to an organization.",
   );
