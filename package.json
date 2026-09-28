@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" dev",
-    "start": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" start",
     "dev:web": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/web dev",
     "dev:api": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev",
-    "dev:worker": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev:worker",
+    "dev:worker": "pnpm --filter @codepulse/shared build && pnpm --filter \"./apps/*\" dev:worker",
+    "start": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" start",
     "build": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api build && pnpm --filter @codepulse/web build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm --filter @codepulse/shared build && pnpm -r typecheck",
