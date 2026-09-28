@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" dev",
+    "start": "pnpm --filter @codepulse/shared build && pnpm --parallel --filter \"./apps/*\" start",
     "dev:web": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/web dev",
     "dev:api": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev",
     "dev:worker": "pnpm --filter @codepulse/shared build && pnpm --filter @codepulse/api dev:worker",
